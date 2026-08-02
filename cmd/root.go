@@ -331,7 +331,7 @@ func rootCmdRun(cmd *cobra.Command, _ []string) {
 	// and external clients.
 	s := &http.Server{
 		Addr:      api.Host + ":" + strconv.Itoa(api.Port),
-		Handler:   router.Configure(manager, pclient),
+		Handler:   router.ConfigureWithContext(cmd.Context(), manager, pclient),
 		TLSConfig: config.DefaultTLSConfig,
 	}
 

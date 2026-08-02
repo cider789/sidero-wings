@@ -510,6 +510,43 @@ func (fs *UnixFS) Rename(oldpath, newpath string) error {
 	return nil
 }
 
+// Replace atomically renames oldpath over an existing regular file. Both paths
+// are resolved descriptor-relatively beneath the filesystem root, preserving the
+// same traversal and symlink protections as Rename.
+func (fs *UnixFS) Replace(oldpath, newpath string) error {
+	if oldpath == newpath {
+		return nil
+	}
+	olddirfd, oldname, closeOld, err := fs.SafePath(oldpath)
+	defer closeOld()
+	if err != nil {
+		return err
+	}
+	newdirfd, newname, closeNew, err := fs.SafePath(newpath)
+	defer closeNew()
+	if err != nil {
+		return err
+	}
+	if oldname == "." || newname == "." {
+		return &PathError{Op: "replace", Path: newname, Err: ErrBadPathResolution}
+	}
+	oldInfo, err := fs.Lstatat(olddirfd, oldname)
+	if err != nil {
+		return err
+	}
+	newInfo, err := fs.Lstatat(newdirfd, newname)
+	if err != nil {
+		return err
+	}
+	if !oldInfo.Mode().IsRegular() || !newInfo.Mode().IsRegular() {
+		return &PathError{Op: "replace", Path: newname, Err: ErrBadPathResolution}
+	}
+	if err := unix.Renameat(olddirfd, oldname, newdirfd, newname); err != nil {
+		return &LinkError{Op: "replace", Old: oldpath, New: newpath, Err: err}
+	}
+	return nil
+}
+
 // Stat returns a FileInfo describing the named file.
 //
 // If there is an error, it will be of type *PathError.

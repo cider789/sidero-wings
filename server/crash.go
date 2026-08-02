@@ -44,7 +44,7 @@ func (cd *CrashHandler) SetLastCrash(t time.Time) {
 //
 // If the server is determined to have crashed, the process will be restarted and the
 // counter for the server will be incremented.
-func (s *Server) handleServerCrash() error {
+func (s *Server) handleServerCrash(exitCode uint32, oomKilled bool) (bool, bool, error) {
 	// No point in doing anything here if the server isn't currently offline, there
 	// is no reason to do a crash detection event. If the server crash detection is
 	// disabled we want to skip anything after this as well.
@@ -54,19 +54,14 @@ func (s *Server) handleServerCrash() error {
 			s.PublishConsoleOutputFromDaemon("Aborting automatic restart, crash detection is disabled for this instance.")
 		}
 
-		return nil
-	}
-
-	exitCode, oomKilled, err := s.Environment.ExitState()
-	if err != nil {
-		return errors.Wrap(err, "failed to get exit state for server process")
+		return false, false, nil
 	}
 
 	// If the system is not configured to detect a clean exit code as a crash, and the
 	// crash is not the result of the program running out of memory, do nothing.
 	if exitCode == 0 && !oomKilled && !config.Get().System.CrashDetection.DetectCleanExitAsCrash {
 		s.Log().Debug("server exited with successful exit code; system is configured to not detect this as a crash")
-		return nil
+		return false, false, nil
 	}
 
 	s.PublishConsoleOutputFromDaemon("---------- Detected server process in a crashed state! ----------")
@@ -82,10 +77,10 @@ func (s *Server) handleServerCrash() error {
 	// If timeout is set to 0, always reboot the server (this is probably a terrible idea, but some people want it)
 	if timeout != 0 && !c.IsZero() && c.Add(time.Second*time.Duration(config.Get().System.CrashDetection.Timeout)).After(time.Now()) {
 		s.PublishConsoleOutputFromDaemon("Aborting automatic restart, last crash occurred less than " + strconv.Itoa(timeout) + " seconds ago.")
-		return &crashTooFrequent{}
+		return true, false, &crashTooFrequent{}
 	}
 
 	s.crasher.SetLastCrash(time.Now())
 
-	return errors.Wrap(s.HandlePowerAction(PowerActionStart), "failed to start server after crash detection")
+	return true, true, errors.Wrap(s.HandlePowerAction(PowerActionStart), "failed to start server after crash detection")
 }

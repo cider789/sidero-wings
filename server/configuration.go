@@ -21,6 +21,16 @@ type ConfigurationMeta struct {
 	Description string `json:"description"`
 }
 
+// SideroAllocation is an optional stable allocation record supplied by a
+// Sidero-aware Panel. Wings uses it to bind game-query and firewall requests to
+// an allocation owned by this server rather than accepting arbitrary targets.
+type SideroAllocation struct {
+	ID            int64  `json:"id"`
+	IP            string `json:"ip"`
+	Port          int    `json:"port"`
+	QueryProvider string `json:"query_provider,omitempty"`
+}
+
 type Configuration struct {
 	mu sync.RWMutex
 
@@ -50,6 +60,7 @@ type Configuration struct {
 	Labels map[string]string `json:"labels"`
 
 	Allocations           environment.Allocations `json:"allocations"`
+	SideroAllocations     []SideroAllocation      `json:"sidero_allocations,omitempty"`
 	Build                 environment.Limits      `json:"build"`
 	CrashDetectionEnabled bool                    `json:"crash_detection_enabled"`
 	Mounts                []Mount                 `json:"mounts"`
@@ -65,6 +76,23 @@ func (s *Server) Config() *Configuration {
 	s.cfg.mu.RLock()
 	defer s.cfg.mu.RUnlock()
 	return &s.cfg
+}
+
+func (s *Server) SideroAllocation(id int64) (SideroAllocation, bool) {
+	s.cfg.mu.RLock()
+	defer s.cfg.mu.RUnlock()
+	for _, allocation := range s.cfg.SideroAllocations {
+		if allocation.ID == id {
+			return allocation, true
+		}
+	}
+	return SideroAllocation{}, false
+}
+
+func (s *Server) DefaultAllocation() (string, int) {
+	s.cfg.mu.RLock()
+	defer s.cfg.mu.RUnlock()
+	return s.cfg.Allocations.DefaultMapping.Ip, s.cfg.Allocations.DefaultMapping.Port
 }
 
 // DiskSpace returns the amount of disk space available to a server in bytes.

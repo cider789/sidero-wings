@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"emperror.dev/errors"
 	"github.com/apex/log"
@@ -18,6 +19,7 @@ import (
 	"github.com/pterodactyl/wings/config"
 	"github.com/pterodactyl/wings/environment"
 	"github.com/pterodactyl/wings/events"
+	sideroprocess "github.com/pterodactyl/wings/internal/sidero/process"
 	"github.com/pterodactyl/wings/remote"
 	"github.com/pterodactyl/wings/server/filesystem"
 	"github.com/pterodactyl/wings/system"
@@ -316,6 +318,7 @@ func (s *Server) EnsureDataDirectoryExists() error {
 // well as reporting to event listeners for the server.
 func (s *Server) OnStateChange() {
 	prevState := s.resources.State.Load()
+	uptimeBeforeExit := s.Proc().Uptime
 
 	st := s.Environment.State()
 	// Update the currently tracked state for the server.
@@ -342,19 +345,37 @@ func (s *Server) OnStateChange() {
 	// automatically attempt to start the process back up for the user. This is done in a
 	// separate thread as to not block any actions currently taking place in the flow
 	// that called this function.
-	if (prevState == environment.ProcessStartingState || prevState == environment.ProcessRunningState) && s.Environment.State() == environment.ProcessOfflineState {
-		s.Log().Info("detected server as entering a crashed state; running crash handler")
+	if prevState != environment.ProcessOfflineState && s.Environment.State() == environment.ProcessOfflineState {
+		expected := prevState == environment.ProcessStoppingState
+		s.Log().WithField("expected", expected).Info("detected server process exit")
 
-		go func(server *Server) {
-			if err := server.handleServerCrash(); err != nil {
-				if IsTooFrequentCrashError(err) {
+		go func(server *Server, previousState string, expected bool, uptime int64) {
+			exitCode, oomKilled, exitErr := server.Environment.ExitState()
+			if exitErr != nil {
+				server.Log().WithField("error", exitErr).Warn("failed to retrieve process exit state for sidero metadata")
+			}
+			crashDetected, restartAttempted := false, false
+			var crashErr error
+			if !expected && (previousState == environment.ProcessStartingState || previousState == environment.ProcessRunningState) && exitErr == nil {
+				crashDetected, restartAttempted, crashErr = server.handleServerCrash(exitCode, oomKilled)
+			}
+			if crashErr != nil {
+				if IsTooFrequentCrashError(crashErr) {
 					server.Log().Info("did not restart server after crash; occurred too soon after the last")
 				} else {
-					s.PublishConsoleOutputFromDaemon("Server crash was detected but an error occurred while handling it.")
-					server.Log().WithField("error", err).Error("failed to handle server crash")
+					server.PublishConsoleOutputFromDaemon("Server crash was detected but an error occurred while handling it.")
+					server.Log().WithField("error", crashErr).Error("failed to handle server crash")
 				}
 			}
-		}(s)
+			crashReport, latestLog := sideroprocess.DiscoverLatestPaths(server.Filesystem(), 100)
+			attempts := 0
+			if restartAttempted {
+				attempts = 1
+			}
+			if config.Get().Sidero.Enabled {
+				server.Events().Publish("sidero process exit", sideroprocess.ExitMetadata{ExitCode: exitCode, Expected: expected, CrashDetected: crashDetected, OOMKilled: oomKilled, RestartAttempted: restartAttempted, RestartAttempts: attempts, RestartExhausted: crashDetected && crashErr != nil, CrashReport: crashReport, LatestLog: latestLog, Timestamp: time.Now().UTC(), UptimeMS: uptime})
+			}
+		}(s, prevState, expected, uptimeBeforeExit)
 	}
 }
 

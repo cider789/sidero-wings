@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"regexp"
 
 	"emperror.dev/errors"
@@ -17,6 +18,12 @@ var tokenRegex = regexp.MustCompile(`([?|&]token=)([^&]+)($|&)`)
 
 // Configure configures the routing infrastructure for this daemon instance.
 func Configure(m *wserver.Manager, client remote.Client) *gin.Engine {
+	return ConfigureWithContext(context.Background(), m, client)
+}
+
+// ConfigureWithContext configures the router and binds extension workers to the
+// daemon lifecycle. Configure remains for compatibility with existing callers.
+func ConfigureWithContext(ctx context.Context, m *wserver.Manager, client remote.Client) *gin.Engine {
 	gin.SetMode("release")
 
 	router := gin.New()
@@ -114,6 +121,8 @@ func Configure(m *wserver.Manager, client remote.Client) *gin.Engine {
 			backup.DELETE("/:backup", deleteServerBackup)
 		}
 	}
+
+	registerSideroRoutes(ctx, protected, server, m)
 
 	return router
 }

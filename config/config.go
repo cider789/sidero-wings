@@ -350,6 +350,7 @@ type Configuration struct {
 	Api    ApiConfiguration    `json:"api" yaml:"api"`
 	System SystemConfiguration `json:"system" yaml:"system"`
 	Docker DockerConfiguration `json:"docker" yaml:"docker"`
+	Sidero SideroConfiguration `json:"sidero" yaml:"sidero"`
 
 	// Defines internal throttling configurations for server processes to prevent
 	// someone from running an endless loop that spams data to logs.
@@ -617,6 +618,9 @@ func FromFile(path string) error {
 	}
 	c.Token.Token, err = Expand(c.Token.Token)
 	if err != nil {
+		return err
+	}
+	if err := c.Sidero.Validate(); err != nil {
 		return err
 	}
 

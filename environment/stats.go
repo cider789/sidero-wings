@@ -25,6 +25,10 @@ type Stats struct {
 }
 
 type NetworkStats struct {
-	RxBytes uint64 `json:"rx_bytes"`
-	TxBytes uint64 `json:"tx_bytes"`
+	RxBytes   uint64 `json:"rx_bytes"`
+	TxBytes   uint64 `json:"tx_bytes"`
+	RxPackets uint64 `json:"rx_packets,omitempty"`
+	TxPackets uint64 `json:"tx_packets,omitempty"`
+	RxDropped uint64 `json:"rx_dropped,omitempty"`
+	TxDropped uint64 `json:"tx_dropped,omitempty"`
 }

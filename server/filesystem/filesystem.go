@@ -216,6 +216,20 @@ func (fs *Filesystem) Rename(oldpath, newpath string) error {
 	return fs.unixFS.Rename(oldpath, newpath)
 }
 
+// AtomicReplace replaces an existing regular file with a staged regular file.
+// The rename is atomic and both paths remain constrained to the server root.
+func (fs *Filesystem) AtomicReplace(oldpath, newpath string) error {
+	current, err := fs.unixFS.Lstat(newpath)
+	if err != nil {
+		return err
+	}
+	if err := fs.unixFS.UnixFS.Replace(oldpath, newpath); err != nil {
+		return err
+	}
+	fs.unixFS.Add(-current.Size())
+	return nil
+}
+
 func (fs *Filesystem) Symlink(oldpath, newpath string) error {
 	return fs.unixFS.Symlink(oldpath, newpath)
 }
