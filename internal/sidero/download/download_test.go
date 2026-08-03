@@ -2,6 +2,7 @@ package download
 
 import (
 	"context"
+	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
@@ -47,6 +48,21 @@ func TestExecuteStagesVerifiesAndCommits(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, body, actual)
 	require.NoDirExists(t, filepath.Join(root, ".sidero", "downloads", result.OperationID))
+}
+
+func TestExecuteSupportsSHA1Checksum(t *testing.T) {
+	body := []byte("vanilla server jar")
+	sum := sha1.Sum(body)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(body) }))
+	defer server.Close()
+	fs, root := downloadTestFilesystem(t)
+	p := Policy{MaximumBytes: 1024, MaximumRedirects: 1, ConnectTimeout: time.Second, TotalTimeout: 2 * time.Second, AllowPrivateNetworks: true}
+	result, err := Execute(context.Background(), fs, NewClient(p), Request{URL: server.URL + "/server.jar", Filename: "server.jar", ChecksumAlgorithm: "sha1", ExpectedChecksum: hex.EncodeToString(sum[:]), ConflictPolicy: ConflictFail}, nil)
+	require.NoError(t, err)
+	require.Equal(t, "server.jar", result.Path)
+	actual, err := os.ReadFile(filepath.Join(root, "server.jar"))
+	require.NoError(t, err)
+	require.Equal(t, body, actual)
 }
 
 func TestExecuteRejectsRedirectToPrivateTarget(t *testing.T) {

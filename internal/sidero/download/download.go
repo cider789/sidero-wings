@@ -3,6 +3,7 @@ package download
 
 import (
 	"context"
+	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
 	"crypto/subtle"
@@ -364,6 +365,18 @@ func checksum(algorithm, expected string) (hash.Hash, string, error) {
 		return nil, "", ErrInvalidRequest
 	}
 	switch algorithm {
+	case "sha1":
+		if len(expected) != sha1.Size*2 {
+			return nil, "", ErrInvalidRequest
+		}
+		decoded, err := hex.DecodeString(expected)
+		if err != nil {
+			return nil, "", err
+		}
+		if len(decoded) != sha1.Size {
+			return nil, "", ErrInvalidRequest
+		}
+		return sha1.New(), expected, nil
 	case "sha256":
 		if len(expected) != sha256.Size*2 {
 			return nil, "", ErrInvalidRequest
