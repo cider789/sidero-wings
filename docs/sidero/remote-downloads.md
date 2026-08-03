@@ -1,6 +1,6 @@
 # Remote Downloads
 
-`POST /api/servers/{uuid}/sidero/files/remote-download` creates a `remote_download` operation. The request accepts `url`, server-relative `destination`, optional `filename`/expected size/checksum, and `fail`, `skip`, `replace`, or deterministic `rename` conflict policy. SHA-256 and SHA-512 are supported.
+`POST /api/servers/{uuid}/sidero/files/remote-download` creates a `remote_download` operation. The request accepts `url`, server-relative `destination`, optional `filename`/expected size/checksum, and `fail`, `skip`, `replace`, or deterministic `rename` conflict policy. SHA-1, SHA-256, and SHA-512 are supported. SHA-1 is retained for official Mojang server artifacts whose manifest still publishes SHA-1; callers must provide the provider's exact expected digest.
 
 Only HTTP(S) URLs without user info are accepted. Exact hostname allow/block policy is checked before DNS, on every redirect, and again during connection. Every resolved IP must pass policy. Connections resolve, revalidate, and dial a validated IP directly; environment proxies are not used. Loopback, private, link-local, multicast, unspecified, carrier-grade NAT, benchmark, documentation, metadata-relevant, and reserved networks are denied unless private-network access is explicitly enabled. Host allowlisting alone never bypasses address policy.
 
