@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 
 	"github.com/pterodactyl/wings/config"
@@ -75,5 +76,33 @@ func TestSideroDisabledCapabilityEndpointRemainsAvailable(t *testing.T) {
 	require.Equal(t, "disabled", healthPayload.Components["safe_extraction"])
 	for name := range capabilitiesPayload.Features {
 		require.Equalf(t, "disabled", healthPayload.Components[name], "component %s should be disabled", name)
+	}
+}
+
+func TestSideroHealthMarksOperationCapabilitiesUnavailableWithoutManager(t *testing.T) {
+	c, err := config.NewAtPath("test.yml")
+	require.NoError(t, err)
+	c.AuthenticationToken = "secret"
+	c.Token.Token = "secret"
+	config.Set(c)
+
+	response := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(response)
+	(&sideroExtension{}).health(ctx)
+
+	var payload struct {
+		Components map[string]string `json:"components"`
+	}
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &payload))
+	for _, name := range []string{
+		"archive_support",
+		"archive_inspection",
+		"safe_extraction",
+		"installer_service",
+		"installer_operations",
+		"resolved_modpack",
+		"world_operations",
+	} {
+		require.Equalf(t, "unavailable", payload.Components[name], "component %s should be unavailable without an operation manager", name)
 	}
 }

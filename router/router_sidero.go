@@ -753,17 +753,18 @@ func (s *sideroExtension) health(c *gin.Context) {
 		state = "unavailable"
 	}
 	features := capabilities.Build(cfg, system.Version).Features
-	archiveInspectionState := featureHealth(features["archive_inspection"], true)
-	safeExtractionState := featureHealth(features["safe_extraction"], true)
-	installerOperationsState := featureHealth(features["installer_operations"], temporaryStorage == "healthy")
-	resolvedModpackState := featureHealth(features["resolved_modpack"], temporaryStorage == "healthy")
-	worldOperationsState := featureHealth(features["world_operations"], features["world_operations"])
+	operationAvailable := operationState == "healthy"
+	archiveInspectionState := featureHealth(features["archive_inspection"], operationAvailable)
+	safeExtractionState := featureHealth(features["safe_extraction"], operationAvailable)
+	installerOperationsState := featureHealth(features["installer_operations"], operationAvailable && temporaryStorage == "healthy")
+	resolvedModpackState := featureHealth(features["resolved_modpack"], operationAvailable && temporaryStorage == "healthy")
+	worldOperationsState := featureHealth(features["world_operations"], operationAvailable)
 	components := gin.H{
 		"configuration":         map[bool]string{true: "healthy", false: "misconfigured"}[cfg.Validate() == nil],
 		"operation_manager":     operationState,
 		"cleanup_workers":       cleanupState,
 		"temporary_storage":     temporaryStorage,
-		"archive_support":       featureHealth(features["archive_inspection"] && features["safe_extraction"], true),
+		"archive_support":       featureHealth(features["archive_inspection"] && features["safe_extraction"], operationAvailable),
 		"archive_inspection":    archiveInspectionState,
 		"safe_extraction":       safeExtractionState,
 		"upload_support":        featureHealth(cfg.Enabled && cfg.Uploads.ResumableEnabled, s.uploads != nil && temporaryStorage == "healthy"),
