@@ -47,6 +47,7 @@ func TestInstallModpackCleanRequiresFlagAndRetainsOnlyValidatedPaths(t *testing.
 	require.FileExists(t, filepath.Join(root, "world", "level.dat"))
 	require.FileExists(t, filepath.Join(root, "server.jar"))
 	require.NoFileExists(t, filepath.Join(root, "old.txt"))
+	require.Empty(t, stagingEntries(t, filepath.Join(root, ".sidero", "modpacks")))
 }
 
 func TestInstallModpackMergeRollsBackEarlierFilesOnCommitFailure(t *testing.T) {
