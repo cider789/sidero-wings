@@ -53,5 +53,27 @@ func TestSideroDisabledCapabilityEndpointRemainsAvailable(t *testing.T) {
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
 	require.Equal(t, http.StatusOK, response.Code)
-	require.Contains(t, response.Body.String(), `"state":"disabled"`)
+	var capabilitiesPayload capabilities.Response
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &capabilitiesPayload))
+	require.False(t, capabilitiesPayload.Features["resolved_modpack"])
+	require.False(t, capabilitiesPayload.Features["archive_inspection"])
+	require.False(t, capabilitiesPayload.Features["safe_extraction"])
+
+	healthRequest := httptest.NewRequest(http.MethodGet, "/api/sidero/v1/health", nil)
+	healthRequest.Header.Set("Authorization", "Bearer secret")
+	healthResponse := httptest.NewRecorder()
+	router.ServeHTTP(healthResponse, healthRequest)
+	require.Equal(t, http.StatusOK, healthResponse.Code)
+	var healthPayload struct {
+		State      string            `json:"state"`
+		Components map[string]string `json:"components"`
+	}
+	require.NoError(t, json.Unmarshal(healthResponse.Body.Bytes(), &healthPayload))
+	require.Equal(t, "disabled", healthPayload.State)
+	require.Equal(t, "disabled", healthPayload.Components["resolved_modpack"])
+	require.Equal(t, "disabled", healthPayload.Components["archive_inspection"])
+	require.Equal(t, "disabled", healthPayload.Components["safe_extraction"])
+	for name := range capabilitiesPayload.Features {
+		require.Equalf(t, "disabled", healthPayload.Components[name], "component %s should be disabled", name)
+	}
 }

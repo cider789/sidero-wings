@@ -60,7 +60,7 @@ func Build(c config.SideroConfiguration, wingsVersion string) Response {
 		WingsVersion:    wingsVersion,
 		SideroVersion:   Version,
 		Features:        features,
-		FeatureVersions: map[string]string{"operations": "1", "files": "1", "query": "1", "firewall": "1", "worlds": "1", "installers": "1"},
+		FeatureVersions: map[string]string{"operations": "1", "files": "1", "query": "1", "firewall": "1", "worlds": "1", "archives": "1", "installers": "1"},
 		Limits: Limits{
 			MaximumRemoteDownloadBytes: c.RemoteDownload.MaximumBytes,
 			MaximumArchiveEntries:      c.Archives.MaximumEntries,

@@ -752,20 +752,41 @@ func (s *sideroExtension) health(c *gin.Context) {
 	if operationState == "unavailable" || cleanupState == "unavailable" {
 		state = "unavailable"
 	}
-	c.JSON(http.StatusOK, gin.H{"state": state, "protocol_version": cfg.ProtocolVersion, "components": gin.H{
-		"configuration":      map[bool]string{true: "healthy", false: "misconfigured"}[cfg.Validate() == nil],
-		"operation_manager":  operationState,
-		"cleanup_workers":    cleanupState,
-		"temporary_storage":  temporaryStorage,
-		"archive_support":    featureHealth(cfg.Enabled && cfg.Archives.InspectionEnabled, true),
-		"upload_support":     featureHealth(cfg.Enabled && cfg.Uploads.ResumableEnabled, s.uploads != nil && temporaryStorage == "healthy"),
-		"query_providers":    featureHealth(cfg.Enabled && cfg.GameQuery.Enabled, s.queries != nil),
-		"installer_service":  featureHealth(cfg.Enabled && cfg.Installers.Enabled, temporaryStorage == "healthy"),
-		"world_operations":   featureHealth(cfg.Enabled && cfg.Worlds.Enabled, cfg.Enabled && cfg.Worlds.Enabled),
-		"network_statistics": networkState,
-		"firewall":           firewallState,
-		"firewall_cleanup":   featureHealth(cfg.Enabled && cfg.Firewall.Enabled, s.firewallCleanupRunning.Load()),
-	}})
+	features := capabilities.Build(cfg, system.Version).Features
+	archiveInspectionState := featureHealth(features["archive_inspection"], true)
+	safeExtractionState := featureHealth(features["safe_extraction"], true)
+	installerOperationsState := featureHealth(features["installer_operations"], temporaryStorage == "healthy")
+	resolvedModpackState := featureHealth(features["resolved_modpack"], temporaryStorage == "healthy")
+	worldOperationsState := featureHealth(features["world_operations"], features["world_operations"])
+	components := gin.H{
+		"configuration":         map[bool]string{true: "healthy", false: "misconfigured"}[cfg.Validate() == nil],
+		"operation_manager":     operationState,
+		"cleanup_workers":       cleanupState,
+		"temporary_storage":     temporaryStorage,
+		"archive_support":       featureHealth(features["archive_inspection"] && features["safe_extraction"], true),
+		"archive_inspection":    archiveInspectionState,
+		"safe_extraction":       safeExtractionState,
+		"upload_support":        featureHealth(cfg.Enabled && cfg.Uploads.ResumableEnabled, s.uploads != nil && temporaryStorage == "healthy"),
+		"query_providers":       featureHealth(cfg.Enabled && cfg.GameQuery.Enabled, s.queries != nil),
+		"installer_service":     installerOperationsState,
+		"installer_operations":  installerOperationsState,
+		"resolved_modpack":      resolvedModpackState,
+		"world_operations":      worldOperationsState,
+		"network_statistics":    networkState,
+		"firewall":              firewallState,
+		"firewall_cleanup":      featureHealth(cfg.Enabled && cfg.Firewall.Enabled, s.firewallCleanupRunning.Load()),
+		"operations":            operationState,
+		"file_search":           featureHealth(features["file_search"], true),
+		"content_search":        featureHealth(features["content_search"], true),
+		"remote_download":       featureHealth(features["remote_download"], true),
+		"resumable_upload":      featureHealth(features["resumable_upload"], s.uploads != nil && temporaryStorage == "healthy"),
+		"game_query_java":       featureHealth(features["game_query_java"], s.queries != nil),
+		"game_query_bedrock":    featureHealth(features["game_query_bedrock"], s.queries != nil),
+		"file_probe":            featureHealth(features["file_probe"], true),
+		"conditional_write":     featureHealth(features["conditional_write"], true),
+		"process_exit_metadata": featureHealth(features["process_exit_metadata"], true),
+	}
+	c.JSON(http.StatusOK, gin.H{"state": state, "protocol_version": cfg.ProtocolVersion, "components": components})
 }
 
 func featureHealth(enabled, available bool) string {
