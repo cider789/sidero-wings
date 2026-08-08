@@ -124,8 +124,7 @@ func configureCmdRun(cmd *cobra.Command, args []string) {
 		panic(err)
 	}
 
-	fmt.Printf("%+v", req.Header)
-	fmt.Println(req.URL.String())
+	fmt.Println("Fetching node configuration from the panel...")
 
 	res, err := c.Do(req)
 	if err != nil {

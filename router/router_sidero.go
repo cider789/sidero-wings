@@ -761,6 +761,7 @@ func (s *sideroExtension) health(c *gin.Context) {
 		"upload_support":     featureHealth(cfg.Enabled && cfg.Uploads.ResumableEnabled, s.uploads != nil && temporaryStorage == "healthy"),
 		"query_providers":    featureHealth(cfg.Enabled && cfg.GameQuery.Enabled, s.queries != nil),
 		"installer_service":  featureHealth(cfg.Enabled && cfg.Installers.Enabled, temporaryStorage == "healthy"),
+		"world_operations":   featureHealth(cfg.Enabled && cfg.Worlds.Enabled, cfg.Enabled && cfg.Worlds.Enabled),
 		"network_statistics": networkState,
 		"firewall":           firewallState,
 		"firewall_cleanup":   featureHealth(cfg.Enabled && cfg.Firewall.Enabled, s.firewallCleanupRunning.Load()),

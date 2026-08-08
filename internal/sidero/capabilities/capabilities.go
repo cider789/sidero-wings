@@ -12,6 +12,7 @@ type Limits struct {
 	MaximumUploadBytes         int64 `json:"maximum_upload_bytes"`
 	MaximumOperationGlobal     int   `json:"maximum_operation_global"`
 	MaximumOperationPerServer  int   `json:"maximum_operation_per_server"`
+	OperationRetentionSeconds  int   `json:"operation_retention_seconds"`
 }
 
 type Compatibility struct {
@@ -59,7 +60,7 @@ func Build(c config.SideroConfiguration, wingsVersion string) Response {
 		WingsVersion:    wingsVersion,
 		SideroVersion:   Version,
 		Features:        features,
-		FeatureVersions: map[string]string{"operations": "1", "files": "1", "query": "1", "firewall": "1"},
+		FeatureVersions: map[string]string{"operations": "1", "files": "1", "query": "1", "firewall": "1", "worlds": "1", "installers": "1"},
 		Limits: Limits{
 			MaximumRemoteDownloadBytes: c.RemoteDownload.MaximumBytes,
 			MaximumArchiveEntries:      c.Archives.MaximumEntries,
@@ -67,6 +68,7 @@ func Build(c config.SideroConfiguration, wingsVersion string) Response {
 			MaximumUploadBytes:         c.Uploads.MaximumUploadBytes,
 			MaximumOperationGlobal:     c.Operations.MaximumConcurrentGlobal,
 			MaximumOperationPerServer:  c.Operations.MaximumConcurrentPerServer,
+			OperationRetentionSeconds:  c.Operations.RetentionSeconds,
 		},
 		Compatibility: Compatibility{State: state},
 	}
