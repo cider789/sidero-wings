@@ -61,6 +61,17 @@ func TestImportInvalidWorldPreservesExistingDestination(t *testing.T) {
 	actual, readErr := os.ReadFile(filepath.Join(root, "world", "level.dat"))
 	require.NoError(t, readErr)
 	require.Equal(t, "original", string(actual))
+	require.Empty(t, worldStagingEntries(t, filepath.Join(root, ".sidero", "worlds")))
+}
+
+func TestImportRejectsRunningServerWithoutCreatingStaging(t *testing.T) {
+	fs, root := worldTestFilesystem(t)
+	require.NoError(t, os.WriteFile(filepath.Join(root, "world.tar"), []byte("not read"), 0o644))
+
+	_, err := Import(context.Background(), fs, "world.tar", "world", "fail", 1024, true, archives.Limits{MaximumEntries: 10, MaximumUncompressedBytes: 1024, MaximumSingleEntryBytes: 1024, MaximumCompressionRatio: 200}, nil)
+
+	require.ErrorIs(t, err, ErrServerRunning)
+	require.Empty(t, worldStagingEntries(t, filepath.Join(root, ".sidero", "worlds")))
 }
 
 func worldTestFilesystem(t *testing.T) (*wfs.Filesystem, string) {
@@ -74,4 +85,14 @@ func worldTestFilesystem(t *testing.T) (*wfs.Filesystem, string) {
 	fs, err := wfs.New(root, 0, nil)
 	require.NoError(t, err)
 	return fs, root
+}
+
+func worldStagingEntries(t *testing.T, directory string) []os.DirEntry {
+	t.Helper()
+	entries, err := os.ReadDir(directory)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	require.NoError(t, err)
+	return entries
 }

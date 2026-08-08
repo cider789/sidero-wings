@@ -2,6 +2,10 @@ package installers
 
 import (
 	"context"
+	"crypto/sha1"
+	"crypto/sha256"
+	"crypto/sha512"
+	"encoding/hex"
 	"errors"
 	iofs "io/fs"
 	"path"
@@ -61,6 +65,9 @@ func InstallModpack(ctx context.Context, filesystem *wfs.Filesystem, client *dow
 	}
 	if request.ConflictPolicy != "fail" && request.ConflictPolicy != "replace" && request.ConflictPolicy != "skip" && request.ConflictPolicy != "rename" {
 		return ModpackResult{}, ErrManifestInvalid
+	}
+	if err := validateModpackRequest(ctx, client, request, limits); err != nil {
+		return ModpackResult{}, err
 	}
 	opID := uuid.NewString()
 	stageRoot := path.Join(".sidero", "modpacks", opID)
@@ -137,6 +144,73 @@ func InstallModpack(ctx context.Context, filesystem *wfs.Filesystem, client *dow
 		progress(1, "Modpack installation completed.")
 	}
 	return result, nil
+}
+
+func validateModpackRequest(ctx context.Context, client *download.Client, request ModpackRequest, limits Limits) error {
+	seen := make(map[string]struct{}, len(request.Files))
+	var expectedTotal int64
+	validateArtifact := func(url string, expectedSize *int64, algorithm, checksum string) error {
+		if _, err := client.ValidateURL(ctx, url); err != nil {
+			return err
+		}
+		if expectedSize == nil {
+			return ErrManifestInvalid
+		}
+		if *expectedSize < 0 || *expectedSize > limits.MaximumDownloadBytes-expectedTotal {
+			return ErrDownloadLimit
+		}
+		if !validModpackChecksum(algorithm, checksum) {
+			return ErrManifestInvalid
+		}
+		expectedTotal += *expectedSize
+		return nil
+	}
+	if request.OverridesArchive != nil {
+		if err := validateArtifact(request.OverridesArchive.URL, request.OverridesArchive.ExpectedSize, request.OverridesArchive.ChecksumAlgorithm, request.OverridesArchive.Checksum); err != nil {
+			return err
+		}
+	}
+	for _, file := range request.Files {
+		destination, err := files.NormalizeClientPath(file.Destination)
+		if err != nil || destination == "." || strings.HasSuffix(file.Destination, "/") {
+			return ErrDestinationInvalid
+		}
+		if _, exists := seen[destination]; exists {
+			return ErrManifestInvalid
+		}
+		seen[destination] = struct{}{}
+		if err := validateArtifact(file.URL, file.ExpectedSize, file.ChecksumAlgorithm, file.Checksum); err != nil {
+			return err
+		}
+	}
+	for _, retained := range request.RetainedPaths {
+		rel, err := files.NormalizeClientPath(retained)
+		if err != nil || rel == "." || rel == ".sidero" || strings.HasPrefix(rel, ".sidero/") {
+			return ErrDestinationInvalid
+		}
+	}
+	return nil
+}
+
+func validModpackChecksum(algorithm, checksum string) bool {
+	algorithm = strings.ToLower(strings.TrimSpace(algorithm))
+	checksum = strings.TrimSpace(checksum)
+	if checksum == "" {
+		return false
+	}
+	length := 0
+	switch algorithm {
+	case "sha1":
+		length = sha1.Size
+	case "sha256":
+		length = sha256.Size
+	case "sha512":
+		length = sha512.Size
+	default:
+		return false
+	}
+	decoded, err := hex.DecodeString(checksum)
+	return err == nil && len(decoded) == length
 }
 
 type treeEntry struct {
