@@ -96,6 +96,9 @@ func TestSideroHealthMarksOperationCapabilitiesUnavailableWithoutManager(t *test
 	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &payload))
 	for _, name := range []string{
 		"archive_support",
+		"file_search",
+		"content_search",
+		"remote_download",
 		"archive_inspection",
 		"safe_extraction",
 		"installer_service",
